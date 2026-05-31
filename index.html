@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KEV • API DASHBOARD</title>
+    <style>
+        body { background: #0d1117; color: #c9d1d9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; }
+        .card { background: #161b22; border: 1px solid #30363d; padding: 20px; border-radius: 10px; max-width: 500px; margin: auto; }
+        input, button { width: 100%; padding: 12px; margin-top: 10px; border-radius: 5px; border: none; }
+        input { background: #0d1117; color: white; border: 1px solid #30363d; box-sizing: border-box; }
+        button { background: #238636; color: white; cursor: pointer; font-weight: bold; }
+        #output { margin-top: 20px; padding: 10px; background: #010409; border-radius: 5px; font-size: 14px; white-space: pre-wrap; }
+        .badge { display: inline-block; padding: 5px 10px; background: #1f6feb; border-radius: 15px; font-size: 12px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="badge">Model: Gemini 1.5 Flash</div>
+        <h2>KevAI Tester</h2>
+        <input type="text" id="userInput" placeholder="Tanya sesuatu...">
+        <button onclick="sendChat()">Kirim Ke AI</button>
+        <div id="output">Hasil akan muncul di sini...</div>
+    </div>
+
+    <script>
+        async function sendChat() {
+            const text = document.getElementById('userInput').value;
+            const output = document.getElementById('output');
+            output.innerText = "⏳ Sedang berpikir...";
+            
+            try {
+                const res = await fetch(`/api/kevai?text=${encodeURIComponent(text)}`);
+                const data = await res.json();
+                output.innerText = data.status ? data.result : "Error: " + data.error;
+            } catch (e) {
+                output.innerText = "Gagal terhubung ke server.";
+            }
+        }
+    </script>
+</body>
+</html>
