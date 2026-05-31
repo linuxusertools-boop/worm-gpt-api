@@ -2,8 +2,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Masukkan semua API Key kamu di sini
 const apiKeys = [
-    "AIzaSyDsFZ3CSg-OSgytA7_N2GBaN6Zqur6QU_Y", // Ini yang suspend
-    "AQ.Ab8RN6KZ_N6iOszedkk8DvmV6wIZ10vlqp8yCJLPgDj8BDqg-w" // Masukkan kunci kedua (Pastikan formatnya benar)
+    "AIzaSyDvQGTp3Lved3pHTOwsM3jfH26pt17aw88"
 ];
 
 // Variable untuk melacak mana kunci yang masih hidup
