@@ -1,9 +1,11 @@
 {
   "version": 2,
-  "routes": [
-    {
-      "src": "/api/kevai",
-      "dest": "/api/kevai.js"
+  "functions": {
+    "api/kevai.js": {
+      "maxDuration": 15
     }
+  },
+  "rewrites": [
+    { "source": "/api/kevai", "destination": "/api/kevai.js" }
   ]
 }
