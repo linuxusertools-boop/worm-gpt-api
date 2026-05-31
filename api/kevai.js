@@ -1,13 +1,13 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-// Masukkan daftar API Key kamu di sini (Rolling System)
+// Masukkan semua API Key kamu di sini
 const apiKeys = [
-    "AIzaSyDsFZ3CSg-OSgytA7_N2GBaN6Zqur6QU_Y",
-    "AQ.Ab8RN6Ji3M0pakUkXmiNFjBJ7p-ctr0FXCqyN_WtJi7lfRM_ig"
-    // Tambahkan lagi jika punya cadangan
+    "AIzaSyDsFZ3CSg-OSgytA7_N2GBaN6Zqur6QU_Y", // Ini yang suspend
+    "AQ.Ab8RN6Ji3M0pakUkXmiNFjBJ7p-ctr0FXCqyN_WtJi7lfRM_ig" // Masukkan kunci kedua (Pastikan formatnya benar)
 ];
 
-let currentKeyIndex = 0;
+// Variable untuk melacak mana kunci yang masih hidup
+let workingKeys = [...apiKeys];
 
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -16,13 +16,13 @@ module.exports = async (req, res) => {
     const query = req.query.text;
     if (!query) return res.status(400).json({ status: false, message: "Query text kosong" });
 
-    // Fungsi untuk mencoba request dengan kunci yang tersedia
-    const tryGenerate = async (attempt = 0) => {
-        if (attempt >= apiKeys.length) {
-            throw new Error("Semua API Key telah mencapai limit (Quota Exhausted).");
+    const tryGenerate = async () => {
+        if (workingKeys.length === 0) {
+            throw new Error("Semua API Key sudah mati atau disuspend.");
         }
 
-        const apiKey = apiKeys[currentKeyIndex];
+        // Ambil kunci pertama dari daftar yang masih kerja
+        const apiKey = workingKeys[0];
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
@@ -31,10 +31,15 @@ module.exports = async (req, res) => {
             const response = await result.response;
             return response.text();
         } catch (error) {
-            // Jika error karena limit (429), pindah ke kunci berikutnya
-            if (error.message.includes("429") || error.message.includes("quota")) {
-                currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
-                return tryGenerate(attempt + 1);
+            const errorMsg = error.message.toLowerCase();
+            
+            // Jika error 403 (Suspend) atau 429 (Limit)
+            if (errorMsg.includes("403") || errorMsg.includes("429") || errorMsg.includes("suspended")) {
+                console.log(`Kunci bermasalah: ${apiKey}. Menghapus dari list...`);
+                // Hapus kunci yang rusak dari daftar kerja
+                workingKeys.shift(); 
+                // Coba lagi dengan kunci berikutnya
+                return tryGenerate();
             }
             throw error;
         }
@@ -49,6 +54,12 @@ module.exports = async (req, res) => {
             result: aiResponse
         });
     } catch (e) {
-        return res.status(500).json({ status: false, error: e.message });
+        // Jika semua kunci gagal, reset list untuk request berikutnya (siapa tahu cuma limit sementara)
+        if (workingKeys.length === 0) workingKeys = [...apiKeys];
+        
+        return res.status(500).json({ 
+            status: false, 
+            error: "Semua API Key gagal: " + e.message 
+        });
     }
 };
