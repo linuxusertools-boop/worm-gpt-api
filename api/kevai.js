@@ -1,64 +1,55 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-// Masukkan semua API Key kamu di sini
+// Hanya menggunakan API Key baru yang aktif
 const apiKeys = [
     "AIzaSyDvQGTp3Lved3pHTOwsM3jfH26pt17aw88"
 ];
 
-// Variable untuk melacak mana kunci yang masih hidup
-let workingKeys = [...apiKeys];
-
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
     res.setHeader('Content-Type', 'application/json');
 
+    if (req.method === 'OPTIONS') return res.status(200).end();
+
     const query = req.query.text;
-    if (!query) return res.status(400).json({ status: false, message: "Query text kosong" });
-
-    const tryGenerate = async () => {
-        if (workingKeys.length === 0) {
-            throw new Error("Semua API Key sudah mati atau disuspend.");
-        }
-
-        // Ambil kunci pertama dari daftar yang masih kerja
-        const apiKey = workingKeys[0];
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-        try {
-            const result = await model.generateContent(query);
-            const response = await result.response;
-            return response.text();
-        } catch (error) {
-            const errorMsg = error.message.toLowerCase();
-            
-            // Jika error 403 (Suspend) atau 429 (Limit)
-            if (errorMsg.includes("403") || errorMsg.includes("429") || errorMsg.includes("suspended")) {
-                console.log(`Kunci bermasalah: ${apiKey}. Menghapus dari list...`);
-                // Hapus kunci yang rusak dari daftar kerja
-                workingKeys.shift(); 
-                // Coba lagi dengan kunci berikutnya
-                return tryGenerate();
-            }
-            throw error;
-        }
-    };
+    if (!query) return res.status(400).json({ status: false, message: "Masukkan parameter ?text=" });
 
     try {
-        const aiResponse = await tryGenerate();
+        // Menggunakan kunci pertama
+        const genAI = new GoogleGenerativeAI(apiKeys[0]);
+        
+        // Memastikan menggunakan versi model yang tepat
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-1.5-flash" 
+        });
+
+        const result = await model.generateContent({
+            contents: [{ role: 'user', parts: [{ text: query }] }]
+        });
+        
+        const response = await result.response;
+        const text = response.text();
+
         return res.status(200).json({
             status: true,
             creator: "KevCodex",
             model: "Gemini 1.5 Flash",
-            result: aiResponse
+            result: text
         });
-    } catch (e) {
-        // Jika semua kunci gagal, reset list untuk request berikutnya (siapa tahu cuma limit sementara)
-        if (workingKeys.length === 0) workingKeys = [...apiKeys];
+
+    } catch (error) {
+        console.error("Error API:", error.message);
         
+        // Memberikan pesan error yang lebih jelas jika limit atau suspend lagi
+        let userErrorMessage = "Terjadi kesalahan pada sistem AI.";
+        if (error.message.includes("429")) userErrorMessage = "Limit API tercapai, coba lagi nanti.";
+        if (error.message.includes("403")) userErrorMessage = "API Key ditangguhkan (Suspended).";
+
         return res.status(500).json({ 
             status: false, 
-            error: "Semua API Key gagal: " + e.message 
+            error: userErrorMessage,
+            raw_message: error.message 
         });
     }
 };
