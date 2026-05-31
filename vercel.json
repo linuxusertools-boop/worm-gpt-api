@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "functions": {
+    "api/kevai.js": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/kevai",
+      "dest": "/api/kevai.js"
+    }
+  ]
+}
