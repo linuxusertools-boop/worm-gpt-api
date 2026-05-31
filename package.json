@@ -1,0 +1,10 @@
+{
+  "name": "kevai-vercel-api",
+  "version": "1.0.0",
+  "description": "KevAI Wrapper for Perchance on Vercel",
+  "main": "api/kevai.js",
+  "dependencies": {
+    "@sparticuz/chromium-min": "^123.0.0",
+    "puppeteer-core": "^22.10.0"
+  }
+}
