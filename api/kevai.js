@@ -10,76 +10,91 @@ module.exports = async (req, res) => {
     let browser;
     try {
         const token = "2UcGtiiW53vvTQsb34883036c91d61a377ddb72471132d695";
-        
-        // Menggunakan flag stealth dan menonaktifkan fitur automation yang terdeteksi
         browser = await puppeteer.connect({
             browserWSEndpoint: `wss://chrome.browserless.io?token=${token}&--disable-blink-features=AutomationControlled`,
         });
 
         const page = await browser.newPage();
-        
-        // Meniru browser asli secara total
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
 
-        // Buka Perchance dengan durasi tunggu yang pas
+        // Buka Perchance
         await page.goto('https://perchance.org/e5nrresv8a', { 
-            waitUntil: 'networkidle2', 
-            timeout: 25000 
+            waitUntil: 'networkidle0', // Menunggu hingga jaringan benar-benar tenang
+            timeout: 30000 
         });
 
-        // Mencari frame generator (Iframe sering berubah ID-nya)
-        const frames = page.frames();
-        const worker = frames.find(f => f.url().includes('perchance.org')) || page;
+        // FUNGSI REKURSIF: Mencari frame yang mengandung textarea chat
+        const findChatFrame = () => {
+            const frames = page.frames();
+            return frames.find(f => f.url().includes('perchance.org') && !f.url().includes('cloudflare'));
+        };
 
-        // Injeksi script untuk pilih model & kirim dalam satu waktu agar cepat
-        const isReady = await worker.evaluate((q) => {
-            const sel = document.querySelector('select');
-            if (sel) {
-                const opt = Array.from(sel.options).findIndex(o => o.text.toLowerCase().includes('flash'));
+        // Tunggu hingga frame tersedia (Max 10 detik)
+        let worker = null;
+        for (let i = 0; i < 20; i++) {
+            worker = findChatFrame();
+            if (worker) {
+                const hasTextarea = await worker.$('textarea').catch(() => null);
+                if (hasTextarea) break;
+            }
+            await new Promise(r => setTimeout(r, 500));
+        }
+
+        if (!worker) throw new Error("Frame chat tidak ditemukan. Coba lagi.");
+
+        // Eksekusi Pilihan Model & Input dalam satu blok agar cepat
+        const executionResult = await worker.evaluate((q) => {
+            const selectModel = document.querySelector('select');
+            if (selectModel) {
+                const opt = Array.from(selectModel.options).findIndex(o => o.text.toLowerCase().includes('flash'));
                 if (opt !== -1) {
-                    sel.selectedIndex = opt;
-                    sel.dispatchEvent(new Event('change', { bubbles: true }));
+                    selectModel.selectedIndex = opt;
+                    selectModel.dispatchEvent(new Event('change', { bubbles: true }));
                 }
             }
-            
-            const tx = document.querySelector('textarea');
-            const btn = document.querySelector('button[title*="send" i]') || document.querySelector('.input-area button');
-            
-            if (tx && btn) {
-                tx.value = q;
-                tx.dispatchEvent(new Event('input', { bubbles: true }));
-                btn.click();
-                return true;
+
+            const inputArea = document.querySelector('textarea');
+            const sendBtn = document.querySelector('button[title*="send" i]') || 
+                            document.querySelector('.input-area button') || 
+                            document.querySelector('button:has(svg)');
+
+            if (inputArea && sendBtn) {
+                inputArea.value = q;
+                inputArea.dispatchEvent(new Event('input', { bubbles: true }));
+                sendBtn.click();
+                return "OK";
             }
-            return false;
+            return "ERR_ELEMENT_NOT_FOUND";
         }, query);
 
-        if (!isReady) throw new Error("Gagal inisialisasi elemen chat.");
+        if (executionResult !== "OK") throw new Error("Gagal menginisialisasi input chat.");
 
-        // Ambil Jawaban (Looping maksimal 8 detik)
+        // Pooling Jawaban (Max 10 detik)
         let result = "";
-        for (let i = 0; i < 12; i++) {
-            await new Promise(r => setTimeout(r, 700));
+        for (let i = 0; i < 15; i++) {
+            await new Promise(r => setTimeout(r, 800));
             result = await worker.evaluate((q) => {
-                const elements = Array.from(document.querySelectorAll('div, span, p'))
+                const bubbles = Array.from(document.querySelectorAll('div, span, p'))
                     .filter(el => {
                         const t = el.innerText.trim();
-                        const isUI = ['close', 'clear', 'flash', 'guest', 'new chat'].some(w => t.toLowerCase().includes(w));
+                        const isUI = ['close', 'clear', 'flash', 'guest', 'new chat', 'memory'].some(w => t.toLowerCase().includes(w));
                         return t.length > 1 && !isUI && t.toLowerCase() !== q.toLowerCase();
                     });
                 
-                const lastText = elements[elements.length - 1]?.innerText.trim();
-                return (lastText && !lastText.includes('⏳')) ? lastText : "WAIT";
+                const lastMsg = bubbles[bubbles.length - 1]?.innerText.trim();
+                return (lastMsg && !lastMsg.includes('⏳') && !lastMsg.toLowerCase().includes('loading')) ? lastMsg : "WAIT";
             }, query);
             
             if (result !== "WAIT") break;
         }
 
         await browser.close();
-        return res.status(200).json({ 
-            status: true, 
+
+        return res.status(200).json({
+            status: true,
             creator: "KevCodex",
-            result: result === "WAIT" ? "AI sedang sibuk, coba lagi." : result 
+            model: "Gemini Flash",
+            result: result === "WAIT" ? "AI merespon terlalu lama." : result
         });
 
     } catch (e) {
