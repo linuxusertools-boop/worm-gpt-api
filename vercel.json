@@ -1,11 +1,8 @@
 {
-  "version": 2,
   "functions": {
     "api/kevai.js": {
-      "maxDuration": 15
+      "maxDuration": 30,
+      "memory": 1024
     }
-  },
-  "rewrites": [
-    { "source": "/api/kevai", "destination": "/api/kevai.js" }
-  ]
+  }
 }
