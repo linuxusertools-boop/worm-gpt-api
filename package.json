@@ -1,7 +1,9 @@
 {
-  "name": "kevai-gemini-api",
+  "name": "kevai-gemini",
   "version": "1.0.0",
+  "description": "KevAI Gemini Core",
+  "main": "api/kevai.js",
   "dependencies": {
-    "@google/generative-ai": "^0.11.0"
+    "@google/generative-ai": "^0.12.0"
   }
 }
